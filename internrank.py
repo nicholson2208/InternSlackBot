@@ -2,6 +2,7 @@ import os
 import time
 from slackclient import SlackClient
 from pymongo import MongoClient
+from intern_utils import *
 
 #make mongo client
 mongo_client = MongoClient('localhost', 23456)
@@ -10,14 +11,12 @@ interns = db.interns
 """
 interns_data = {
     'name': 'matt',
-    'rank': 1,
     'points': 1000
 }
 result = interns.insert_one(interns_data)
 print('One post: {0}'.format(result.inserted_id))
 interns_data = {
     'name': 'jimmy',
-    'rank': 2,
     'points': 100
 }
 result1 = interns.insert_one(interns_data)
@@ -39,32 +38,45 @@ def get_status():
     print "status called"
 
     #get top spot
+    top=interns.find().sort("points", -1)[0]
+    name = top["name"]
+    points = top["points"]
 
     return "The current leader is "+name+", with "+str(points)+"."
 
 def update_rank():
     print "update rank called"
+    iter=0
+    response=""
     #sort in ascending order or something
-    pass
+    for intern in interns.find().sort("points", -1):
+        iter+=1
 
-def get_rank():
-    print "rank called"
-    update_rank()
+        response+=str(iter)+". "+intern["name"] +"\t"+str(intern["points"]) + "\n"
+        print intern["points"]
+
+    return response
+
+def get_rankings():
+    print "rankings called"
+    response= update_rank()
 
     #print out the power rankings
 
-    return "Who even cares, Matt is going to win."
+    return response #"Who even cares, Matt is going to win."
 
 def add_points(command):
+    #TODO: add functionality to deduct points from the points giver
     print "points called"
     assert command[0] == "points"
-    name, points_to_add = command[1],command[2]
+    name, points_to_add = command[1],float(command[2])
     print "the name is "+name
-    if name =="matt" and points_to_add<0:
-        print "You can't take points away from Matt!"
+    if name == "matt" and points_to_add<0:
+        return "You can't take points away from Matt!"
+
     old_points=interns.find_one({"name" : name})["points"]
 
-    new_points= old_points+float(points_to_add)
+    new_points= old_points+points_to_add
     interns.find_one_and_update( {"name" : name}, {"$set":{"points": new_points}})
 
     return points_to_add + " points to "+name +"! "+name+" now has "+ str(new_points) +" points."
@@ -83,16 +95,20 @@ def get_help():
     response = "Use the the format '@intern.rank + <<command>>' and try one of the following commands:\n"
     response+="intern\nJimmy\nMatt\n"
     response+="points <<intern_name>> <<number of points to add>> \n"
-    response+="rank\nstatus"
+    response+="rankings\nstatus"
     return response
 
 def get_Matt():
+    #these functions are really dumb idk
     print "Matt called"
 
     return "@matt.nicholson I think someone wants to talk to you"
 
 def get_Jimmy():
+    #these functions are dumb
     print "Jimmy called"
+    bankrupt("jimmy") #lol
+
     return "@jimmycarlson I think someone wants to talk to you"
 
 def handle_command(command, channel):
@@ -102,13 +118,12 @@ def handle_command(command, channel):
         returns back what it needs for clarification.
     """
     command=command.split(" ")
-    print "len " + str(len(command))
 
     if command[0] == "status":
         response=get_status()
 
-    elif command[0] == "rank":
-        response=get_rank()
+    elif command[0] == "rankings":
+        response=get_rankings()
     elif command[0] == "points":
         response=add_points(command)
         
@@ -150,10 +165,15 @@ def parse_slack_output(slack_rtm_output):
 
 if __name__ == "__main__":
     READ_WEBSOCKET_DELAY = 1 # 1 second delay between reading from firehose
- #   handle_command("help", True)
+#    handle_command("status", True)
 
     if slack_client.rtm_connect():
         print("StarterBot connected and running!")
+
+        #INIT stuff here
+        #add_users(get_users(slack_client))
+
+
         while True:
             command, channel = parse_slack_output(slack_client.rtm_read())
             if command and channel:
@@ -162,3 +182,4 @@ if __name__ == "__main__":
             time.sleep(READ_WEBSOCKET_DELAY)
     else:
         print("Connection failed. Invalid Slack token or bot ID?")
+

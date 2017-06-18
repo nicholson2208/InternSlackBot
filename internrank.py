@@ -4,8 +4,8 @@ from slackclient import SlackClient
 from pymongo import MongoClient
 from intern_utils import *
 
-#make mongo client
-mongo_client = MongoClient('localhost', 23456)
+# make mongo client
+mongo_client = MongoClient('localhost', 34567)
 db =mongo_client.pymongo_test
 interns = db.interns
 """
@@ -44,6 +44,7 @@ def get_status():
 
     return "The current leader is "+name+", with "+str(points)+"."
 
+
 def update_rank():
     print "update rank called"
     iter=0
@@ -57,29 +58,46 @@ def update_rank():
 
     return response
 
+
 def get_rankings():
     print "rankings called"
     response= update_rank()
 
-    #print out the power rankings
-
     return response #"Who even cares, Matt is going to win."
 
-def add_points(command):
-    #TODO: add functionality to deduct points from the points giver
+
+def add_points(command, sender):
+    # TODO: change this to be not 3 calls
     print "points called"
     assert command[0] == "points"
+
     name, points_to_add = command[1],float(command[2])
-    print "the name is "+name
-    if name == "matt" and points_to_add<0:
-        return "You can't take points away from Matt!"
 
-    old_points=interns.find_one({"name" : name})["points"]
+    if check_awarding_privileges(sender):
+        awarder = employees.find_one({"userID":sender})
+        awarders_points = float(awarder["awarding_points"])
+        awarder_name = awarder["name"]
 
-    new_points= old_points+points_to_add
-    interns.find_one_and_update( {"name" : name}, {"$set":{"points": new_points}})
+        if awarders_points <= 0:
+            return "Sorry, you don't have any more points to award. Points replenish on Monday."
 
-    return points_to_add + " points to "+name +"! "+name+" now has "+ str(new_points) +" points."
+        if name == "matt" and points_to_add<0:
+            return "You can't take points away from Matt!"
+
+        old_points=interns.find_one({"name" : name})["points"]
+        new_points= old_points+points_to_add
+        interns.find_one_and_update( {"name" : name}, {"$set":{"points": new_points}})
+
+        new_awarders_points = awarders_points - points_to_add
+        employees.find_one_and_update( {"userID" : sender}, {"$set":{"awarding_points": new_awarders_points}})
+
+        response = str(points_to_add) + " points to "+name + "! " + name + " now has " + str(new_points) + " points. \n"
+        response += awarder_name + " has " + str(new_awarders_points) + " left to award for the week."
+
+        return response
+
+    else:
+        return "Sorry, you can't award points."
 
 
 def get_intern():
@@ -90,6 +108,7 @@ def get_intern():
 
     return "The super special intern is Jimmy right now."
 
+
 def get_help():
     print "help called"
     response = "Use the the format '@intern.rank + <<command>>' and try one of the following commands:\n"
@@ -98,51 +117,54 @@ def get_help():
     response+="rankings\nstatus"
     return response
 
+
 def get_Matt():
-    #these functions are really dumb idk
+    # these functions are really dumb idk
     print "Matt called"
 
     return "@matt.nicholson I think someone wants to talk to you"
 
+
 def get_Jimmy():
-    #these functions are dumb
+    # these functions are dumb
     print "Jimmy called"
-    bankrupt("jimmy") #lol
+    bankrupt("jimmy") # lol
 
     return "@jimmycarlson I think someone wants to talk to you"
 
-def handle_command(command, channel):
+
+def handle_command(command, channel, sender):
     """
         Receives commands directed at the bot and determines if they
         are valid commands. If so, then acts on the commands. If not,
         returns back what it needs for clarification.
     """
-    command=command.split(" ")
+    command = command.split(" ")
 
     if command[0] == "status":
-        response=get_status()
+        response = get_status()
 
     elif command[0] == "rankings":
-        response=get_rankings()
+        response = get_rankings()
+
     elif command[0] == "points":
-        response=add_points(command)
-        
+        response = add_points(command, sender)
+
     elif command[0] == "intern":
-        response=get_intern()
+        response = get_intern()
 
-    elif command[0]=="help":
-        response=get_help()
+    elif command[0] == "help":
+        response = get_help()
 
-    elif command[0] =="matt":
+    elif command[0] == "matt":
         response=get_Matt()
 
-    elif command[0] =="jimmy":
+    elif command[0] == "jimmy":
         response=get_Jimmy()
 
     else:
         response="Sorry, I didn't quite catch that. Type @intern.rank help for more options"
-        
-    #response = "Matt gets 1000 points!"
+
     print response
     slack_client.api_call("chat.postMessage", channel=channel, text=response, as_user=True)
 
@@ -154,31 +176,26 @@ def parse_slack_output(slack_rtm_output):
         directed at the Bot, based on its ID.
     """
     output_list = slack_rtm_output
+
     if output_list and len(output_list) > 0:
         for output in output_list:
             if output and 'text' in output and AT_BOT in output['text']:
                 # return text after the @ mention, whitespace removed
-                return output['text'].split(AT_BOT)[1].strip().lower(), \
-                       output['channel']
-    return None, None
+                return output['text'].split(AT_BOT)[1].strip().lower(), output['channel'], output_list[0]["user"]
+    return None, None, None
 
 
 if __name__ == "__main__":
-    READ_WEBSOCKET_DELAY = 1 # 1 second delay between reading from firehose
-#    handle_command("status", True)
+    READ_WEBSOCKET_DELAY = 1  # 1 second delay between reading from firehose
 
     if slack_client.rtm_connect():
         print("StarterBot connected and running!")
 
-        #INIT stuff here
-        #add_users(get_users(slack_client))
-
-
         while True:
-            command, channel = parse_slack_output(slack_client.rtm_read())
+            command, channel, sender = parse_slack_output(slack_client.rtm_read())
             if command and channel:
                 print "command detected " + str(command) + "\n"
-                handle_command(command, channel)
+                handle_command(command, channel, sender)
             time.sleep(READ_WEBSOCKET_DELAY)
     else:
         print("Connection failed. Invalid Slack token or bot ID?")

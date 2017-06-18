@@ -87,12 +87,12 @@ def initialize():
     add_intern("matt", 0)
     add_intern("jimmy", 0)
 
-"""
+
 if __name__ == "__main__":
     if slack_client.rtm_connect():
         print("StarterBot connected and running!")
         initialize()
-"""
+
 
 
 """

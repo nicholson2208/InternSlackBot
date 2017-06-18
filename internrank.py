@@ -6,7 +6,7 @@ from intern_utils import *
 
 # make mongo client
 mongo_client = MongoClient('localhost', 34567)
-db =mongo_client.pymongo_test
+db = mongo_client.pymongo_test
 interns = db.interns
 """
 interns_data = {
@@ -33,6 +33,11 @@ EXAMPLE_COMMAND = "points"
 # instantiate Slack & Twilio clients
 slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
 
+
+def get_about():
+    print "about"
+    return "intern.rank is a bot created by the interns to haze themselves. Try typing '@intern.rank' help to get " \
+           "started "
 
 def get_status():
     print "status called"
@@ -78,8 +83,9 @@ def add_points(command, sender):
         awarders_points = float(awarder["awarding_points"])
         awarder_name = awarder["name"]
 
-        if awarders_points <= 0:
-            return "Sorry, you don't have any more points to award. Points replenish on Monday."
+        if awarders_points <= points_to_add:
+            return "Sorry, you can\'t award {0} points, you only have {1}. Points replenish on Monday.".format(
+                str(points_to_add), str(awarders_points))
 
         if name == "matt" and points_to_add<0:
             return "You can't take points away from Matt!"
@@ -112,7 +118,7 @@ def get_intern():
 def get_help():
     print "help called"
     response = "Use the the format '@intern.rank + <<command>>' and try one of the following commands:\n"
-    response+="intern\nJimmy\nMatt\n"
+    response+="about\nintern\nJimmy\nMatt\n"
     response+="points <<intern_name>> <<number of points to add>> \n"
     response+="rankings\nstatus"
     return response
@@ -157,10 +163,13 @@ def handle_command(command, channel, sender):
         response = get_help()
 
     elif command[0] == "matt":
-        response=get_Matt()
+        response = get_Matt()
 
     elif command[0] == "jimmy":
-        response=get_Jimmy()
+        response = get_Jimmy()
+
+    elif command[0] == "about":
+        response = get_about()
 
     else:
         response="Sorry, I didn't quite catch that. Type @intern.rank help for more options"

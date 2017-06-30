@@ -1,11 +1,62 @@
 from pymongo import MongoClient
 from slackclient import SlackClient
 import os
+import json
 
-# TODO: maybe refactor to make it a class, also generally don't do redundant connections
+# TODO: maybe refactor to make it a class, also generally don't do redundant connections,
+# TODO: serialize the object when you pull and check for updates every 2 mins or something and update if changes
 
 # I think I should pass in a database connection or something to all of these ... , db)
 
+# TODO: figure out what makes the most sense to return
+
+
+class Person():
+    def __init__(self, name, points_to_award=100, has_awarding_privileges=True ):
+        # type: (str, float, bool) -> object
+        self.name = name
+        self.points_to_award = points_to_award
+        self.awarding_privileges = has_awarding_privileges
+        self.user_id = ""
+
+    def replenish(self, points=100):
+        self.points_to_award = points
+
+    def check_awarding_privileges(self):
+        return self.awarding_privileges
+
+    def award_points(self, intern, amount):
+        # type: (Person, Intern) -> None
+        # should probably return some info maybe like in a string
+        if self.points_to_award >= amount > 0:
+            self.points_to_award -= amount
+            intern.add_points(amount)
+        else:
+            pass
+
+
+class Intern(Person):
+    def __init__(self, name, points=0):
+        self.points = 0
+        super(Intern, self).__init__(name)
+
+    def add_points(self, points):
+        # type: (float) -> object
+        assert isinstance(points, float)
+        self.points += points
+
+
+class Matt(Intern):
+    def __init__(self):
+        super(Matt, self).__init__("Matt")
+
+    @staticmethod #maybe, but possibly not
+    def revoke_awarding_privileges(person):
+        person.awarding_privileges = False
+
+    @staticmethod
+    def grant_awarding_privilege(person):
+        person.awarding_privileges = False
 # make mongo client
 mongo_client = MongoClient('localhost', 34567)
 db =mongo_client.pymongo_test
